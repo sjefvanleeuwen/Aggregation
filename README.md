@@ -14,6 +14,7 @@ The Aggregation Library provides a powerful and extensible way to aggregate data
 - **Time-Based Aggregation**: Group and aggregate data by day, week, month, or year
 - **Stateful Aggregation**: Efficiently maintain hierarchical aggregates that update automatically
 - **Fluent API**: Intuitive configuration interface for specifying aggregation behavior
+- **Primary Key Support**: Designate a property as the primary key for unique identification
 
 ## Basic Usage
 
@@ -129,6 +130,31 @@ var config = new AggregationConfiguration<EnergyReading>()
 var config = new AggregationConfiguration<EnergyReading>()
     .Properties(AggregationMethod.Sum, r => r.KwH, r => r.ReadingCount)
     .Properties(AggregationMethod.Average, r => r.Voltage, r => r.Temperature);
+```
+
+### Using Primary Keys
+
+Primary keys are useful for unique identification of records, especially when merging or looking up aggregated data.
+
+```csharp
+// Configure with a primary key
+var config = new AggregationConfiguration<EnergyReading>()
+    .PrimaryKey(r => r.MeterId)
+    .Property(r => r.KwH, AggregationMethod.Sum);
+
+// Access the primary key property name
+string? primaryKeyProperty = config.GetPrimaryKeyPropertyName();
+Console.WriteLine($"Primary key property: {primaryKeyProperty}"); // Output: Primary key property: MeterId
+
+// Using primary key with stateful aggregator
+var statefulAggregator = new StatefulAggregator<EnergyReading>(
+    r => r.Timestamp,
+    config);
+
+// This enables features like:
+// - Ensuring unique records by key
+// - Merging aggregates across different periods
+// - Looking up specific aggregated records
 ```
 
 ### Configure All Numeric Properties
