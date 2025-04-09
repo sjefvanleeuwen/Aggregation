@@ -36,7 +36,7 @@ public class AggregationConfiguration<T> where T : class, new()
 {
     private readonly Dictionary<string, PropertyAggregationConfig> _configurations = new();
     private readonly HashSet<string> _excludedProperties = new();
-    private string? _primaryKeyPropertyName;
+    private readonly List<string> _primaryKeyPropertyNames = new();
 
     /// <summary>
     /// Specifies which property should be treated as the primary key
@@ -44,7 +44,29 @@ public class AggregationConfiguration<T> where T : class, new()
     public AggregationConfiguration<T> PrimaryKey<TProp>(Expression<Func<T, TProp>> propertySelector)
     {
         var propertyName = ExtractPropertyName(propertySelector);
-        _primaryKeyPropertyName = propertyName;
+        _primaryKeyPropertyNames.Clear(); // Clear existing keys
+        _primaryKeyPropertyNames.Add(propertyName);
+        return this;
+    }
+
+    /// <summary>
+    /// Specifies multiple properties that together form a composite primary key
+    /// </summary>
+    public AggregationConfiguration<T> CompositeKey(params Expression<Func<T, object>>[] propertySelectors)
+    {
+        if (propertySelectors == null || propertySelectors.Length == 0)
+        {
+            throw new ArgumentException("At least one property must be provided for composite key", nameof(propertySelectors));
+        }
+
+        _primaryKeyPropertyNames.Clear(); // Clear existing keys
+
+        foreach (var selector in propertySelectors)
+        {
+            var propertyName = ExtractPropertyName(selector);
+            _primaryKeyPropertyNames.Add(propertyName);
+        }
+
         return this;
     }
 
@@ -138,36 +160,57 @@ public class AggregationConfiguration<T> where T : class, new()
     }
 
     // Helper methods for internal use
-    internal AggregationMethod GetMethodForProperty(string propertyName)
+    public AggregationMethod GetMethodForProperty(string propertyName)
     {
         return _configurations.TryGetValue(propertyName, out var config)
             ? config.Method
             : AggregationMethod.Sum; // Default to Sum
     }
 
-    internal Delegate? GetCustomAggregatorForProperty(string propertyName)
+    public Delegate? GetCustomAggregatorForProperty(string propertyName)
     {
         return _configurations.TryGetValue(propertyName, out var config)
             ? config.CustomAggregator
             : null;
     }
 
-    internal bool HasConfigurationForProperty(string propertyName)
+    public bool HasConfigurationForProperty(string propertyName)
     {
         return _configurations.ContainsKey(propertyName);
     }
 
-    internal bool IsPropertyExcluded(string propertyName)
+    public bool IsPropertyExcluded(string propertyName)
     {
         return _excludedProperties.Contains(propertyName);
     }
 
     /// <summary>
-    /// Gets the name of the property configured as the primary key, if any
+    /// Gets the names of properties configured as primary key components
     /// </summary>
-    internal string? GetPrimaryKeyPropertyName()
+    public IReadOnlyList<string> GetPrimaryKeyPropertyNames()
     {
-        return _primaryKeyPropertyName;
+        return _primaryKeyPropertyNames;
+    }
+
+    /// <summary>
+    /// Gets the name of the property configured as the primary key, if any.
+    /// If a composite key is configured, returns the first property name.
+    /// </summary>
+    /// <remarks>
+    /// This method is maintained for backward compatibility.
+    /// For composite keys, use GetPrimaryKeyPropertyNames() instead.
+    /// </remarks>
+    public string? GetPrimaryKeyPropertyName()
+    {
+        return _primaryKeyPropertyNames.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Checks if a composite key is configured (more than one primary key property)
+    /// </summary>
+    public bool HasCompositeKey()
+    {
+        return _primaryKeyPropertyNames.Count > 1;
     }
 
     private string ExtractPropertyName<TProp>(Expression<Func<T, TProp>> propertySelector)

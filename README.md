@@ -132,30 +132,38 @@ var config = new AggregationConfiguration<EnergyReading>()
     .Properties(AggregationMethod.Average, r => r.Voltage, r => r.Temperature);
 ```
 
-### Using Primary Keys
+### Using Primary Keys and Composite Keys
 
-Primary keys are useful for unique identification of records, especially when merging or looking up aggregated data.
+The library supports both simple primary keys and composite keys for unique identification of records.
 
 ```csharp
-// Configure with a primary key
+// Configure with a simple primary key
 var config = new AggregationConfiguration<EnergyReading>()
     .PrimaryKey(r => r.MeterId)
     .Property(r => r.KwH, AggregationMethod.Sum);
 
-// Access the primary key property name
-string? primaryKeyProperty = config.GetPrimaryKeyPropertyName();
-Console.WriteLine($"Primary key property: {primaryKeyProperty}"); // Output: Primary key property: MeterId
+// Or use a composite key (multiple properties that together form a unique identifier)
+var compositeConfig = new AggregationConfiguration<EnergyReading>()
+    .CompositeKey(
+        r => r.MeterId,
+        r => r.Timestamp.Date
+    )
+    .Property(r => r.KwH, AggregationMethod.Sum);
 
-// Using primary key with stateful aggregator
-var statefulAggregator = new StatefulAggregator<EnergyReading>(
-    r => r.Timestamp,
-    config);
+// Access primary key properties
+string? singleKeyProperty = config.GetPrimaryKeyPropertyName();
+IReadOnlyList<string> compositeKeyProperties = compositeConfig.GetPrimaryKeyPropertyNames();
 
-// This enables features like:
-// - Ensuring unique records by key
-// - Merging aggregates across different periods
-// - Looking up specific aggregated records
+// Check if using a composite key
+bool isComposite = compositeConfig.HasCompositeKey(); // Returns true
+
+// Using composite keys enables:
+// - Aggregating data by multiple dimensions (e.g., by meter AND by date)
+// - Creating multi-level hierarchies for data exploration
+// - Implementing complex data partitioning strategies
 ```
+
+Composite keys are particularly useful when you need to group data by multiple criteria simultaneously, such as device ID and time period, or geographic region and measurement type.
 
 ### Configure All Numeric Properties
 
